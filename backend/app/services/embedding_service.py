@@ -4,19 +4,28 @@ from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
 import os
 
+# Set environment variables to disable telemetry before importing ChromaDB
+os.environ["ANONYMIZED_TELEMETRY"] = "false"
+os.environ["CHROMA_TELEMETRY"] = "false"
+
 class EmbeddingService:
     def __init__(self):
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
         
-        # Initialize ChromaDB client with telemetry completely disabled
-        self.client = chromadb.PersistentClient(
-            path="./chroma_db",
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=True,
-                is_persistent=True
+        # Try to initialize ChromaDB with minimal settings for Python 3.8 compatibility
+        try:
+            self.client = chromadb.PersistentClient(
+                path="./chroma_db",
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True,
+                    is_persistent=True
+                )
             )
-        )
+        except Exception as e:
+            print(f"Error initializing ChromaDB with settings: {e}")
+            # Fallback to basic client
+            self.client = chromadb.PersistentClient(path="./chroma_db")
         
         # Get or create collection
         try:

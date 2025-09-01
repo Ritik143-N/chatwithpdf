@@ -1,12 +1,11 @@
 services:
-  # Backend service
+  # Single service deployment using simple Docker approach
   - type: web
-    name: chatwithpdf-backend
+    name: chatwithpdf-app
     env: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
+    dockerfilePath: Dockerfile.simple
+    dockerContext: .
     plan: starter
-    region: oregon
     envVars:
       - key: PORT
         value: 8000
@@ -14,15 +13,3 @@ services:
       name: chroma-data
       mountPath: /app/chroma_db
       sizeGB: 1
-    
-  # Frontend service  
-  - type: web
-    name: chatwithpdf-frontend
-    env: docker
-    dockerfilePath: frontend/Dockerfile
-    dockerContext: frontend
-    plan: starter
-    region: oregon
-    envVars:
-      - key: REACT_APP_BACKEND_URL
-        value: https://chatwithpdf-backend.onrender.com/api/v1
