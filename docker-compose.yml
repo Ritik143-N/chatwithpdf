@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
+      - USE_LOCAL_LLM=${USE_LOCAL_LLM:-false}
+    volumes:
+      - ./backend/chroma_db:/app/chroma_db
+    networks:
+      - app-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8000/api/v1
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

@@ -1,0 +1,20 @@
+{
+  "name": "Chat with PDF - Backend",
+  "description": "A FastAPI backend for chatting with PDF documents using RAG",
+  "keywords": ["fastapi", "pdf", "rag", "ai", "chatbot"],
+  "env": {
+    "HUGGING_FACE_TOKEN": {
+      "description": "HuggingFace API token for LLM access",
+      "required": false
+    },
+    "USE_LOCAL_LLM": {
+      "description": "Set to true to use local Ollama instead of HuggingFace",
+      "value": "false"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
