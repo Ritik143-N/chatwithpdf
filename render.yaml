@@ -1,14 +1,12 @@
 services:
-  # Single service deployment using production-ready Docker
+  # Single service - FastAPI serves everything (no Nginx)
   - type: web
     name: chatwithpdf-app
     env: docker
-    dockerfilePath: Dockerfile.production
+    dockerfilePath: Dockerfile.render-simple
     dockerContext: .
     plan: starter
     envVars:
-      - key: PORT
-        value: 8000
       - key: PYTHONUNBUFFERED
         value: 1
     disk:

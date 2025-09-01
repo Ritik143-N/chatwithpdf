@@ -50,12 +50,12 @@ app.include_router(router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
-    return {"msg": "Chat with PDF API is running"}
+    return {"msg": "Chat with PDF API is running", "ml_available": ML_AVAILABLE}
 
 # Health check endpoint
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "service": "chat-with-pdf"}
+    return {"status": "healthy", "service": "chat-with-pdf", "ml_available": ML_AVAILABLE}
 
 # Serve React app for all other routes (if static directory exists)
 @app.get("/{full_path:path}")
