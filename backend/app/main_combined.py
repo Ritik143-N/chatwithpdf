@@ -2,8 +2,30 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from .routes.api import router
 import os
+
+# Try to import routes - handle gracefully if ML dependencies are missing
+try:
+    from .routes.api import router
+    ML_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: ML dependencies not available: {e}")
+    from fastapi import APIRouter
+    router = APIRouter()
+    ML_AVAILABLE = False
+    
+    # Create basic endpoints when ML is not available
+    @router.get("/health")
+    def health_check():
+        return {"status": "healthy", "ml_available": False}
+    
+    @router.post("/upload")
+    def upload_placeholder():
+        return {"error": "ML dependencies not available", "message": "Please install sentence-transformers and chromadb"}
+    
+    @router.post("/ask")
+    def ask_placeholder():
+        return {"error": "ML dependencies not available", "message": "Please install sentence-transformers and chromadb"}
 
 app = FastAPI(
     title="Chat with PDF API",

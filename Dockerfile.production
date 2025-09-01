@@ -1,0 +1,63 @@
+# Production-ready single container for Render deployment
+# Uses staged pip installations to handle network issues
+
+FROM node:18-alpine AS frontend-build
+
+WORKDIR /frontend
+
+# Copy and build frontend
+COPY frontend/package*.json ./
+RUN npm ci --only=production --silent
+COPY frontend/ ./
+RUN npm run build
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Upgrade pip and install basic packages first
+RUN pip install --upgrade pip setuptools wheel
+
+# Copy requirements and install in stages
+COPY backend/requirements_minimal.txt ./requirements_minimal.txt
+
+# Install core dependencies first (most likely to succeed)
+RUN pip install --no-cache-dir --timeout 300 --retries 3 -r requirements_minimal.txt
+
+# Try to install ML packages separately (optional)
+RUN pip install --no-cache-dir --timeout 300 sentence-transformers==2.2.2 || \
+    echo "sentence-transformers installation failed, skipping..."
+
+RUN pip install --no-cache-dir --timeout 300 chromadb==0.3.29 || \
+    echo "chromadb installation failed, skipping..."
+
+# Copy backend code
+COPY backend/app/ ./app/
+
+# Copy frontend build
+COPY --from=frontend-build /frontend/build ./static
+
+# Create necessary directories
+RUN mkdir -p ./chroma_db
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
+
+# Start the application
+CMD ["uvicorn", "app.main_combined:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

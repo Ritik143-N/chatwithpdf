@@ -1,14 +1,16 @@
 services:
-  # Single service deployment using simple Docker approach
+  # Single service deployment using production-ready Docker
   - type: web
     name: chatwithpdf-app
     env: docker
-    dockerfilePath: Dockerfile.simple
+    dockerfilePath: Dockerfile.production
     dockerContext: .
     plan: starter
     envVars:
       - key: PORT
         value: 8000
+      - key: PYTHONUNBUFFERED
+        value: 1
     disk:
       name: chroma-data
       mountPath: /app/chroma_db
