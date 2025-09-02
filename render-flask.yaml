@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: chatwithpdf-flask
+    env: python
+    buildCommand: "pip install -r requirements_flask.txt"
+    startCommand: "python backend/app_flask.py"
+    plan: free
+    dockerfilePath: ./Dockerfile.flask
+    repo: https://github.com/yourusername/chatwithpdf
+    branch: main
+    envVars:
+      - key: PORT
+        sync: false
+      - key: FLASK_ENV
+        value: "production"

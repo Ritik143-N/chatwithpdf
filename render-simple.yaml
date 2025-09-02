@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: chatwithpdf-simple
+    env: python
+    buildCommand: ""
+    startCommand: "python backend/simple_server.py"
+    plan: free
+    dockerfilePath: ./Dockerfile.simple-server
+    repo: https://github.com/yourusername/chatwithpdf
+    branch: main
+    envVars:
+      - key: PORT
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11"

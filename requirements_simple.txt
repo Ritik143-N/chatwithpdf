@@ -1,0 +1,5 @@
+# Simple Python server requirements
+requests==2.31.0
+pdfplumber==0.10.3
+Pillow==10.1.0
+python-dotenv==1.0.0

@@ -1,26 +1,16 @@
 services:
-  # Backend service using simple approach
+  # Single Flask backend serving both API and frontend
   - type: web
-    name: chatwithpdf-backend
+    name: chatwithpdf-app
     env: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    plan: starter
+    dockerfilePath: ./Dockerfile.flask
+    plan: free
     envVars:
-      - key: PYTHONUNBUFFERED
-        value: 1
+      - key: PORT
+        sync: false
+      - key: FLASK_ENV
+        value: "production"
     disk:
-      name: chroma-data
-      mountPath: /app/chroma_db
+      name: app-data
+      mountPath: /app/data
       sizeGB: 1
-  
-  # Frontend service  
-  - type: web
-    name: chatwithpdf-frontend
-    env: docker
-    dockerfilePath: frontend/Dockerfile
-    dockerContext: frontend
-    plan: starter
-    envVars:
-      - key: REACT_APP_BACKEND_URL
-        value: https://chatwithpdf-backend.onrender.com/api/v1

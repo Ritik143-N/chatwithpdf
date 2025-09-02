@@ -1,0 +1,33 @@
+# Pure Python HTTP server (no frameworks)
+# Minimal deployment option
+
+FROM node:18-alpine AS frontend-build
+
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci --only=production
+COPY frontend/ ./
+RUN npm run build
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install minimal dependencies
+COPY backend/requirements_minimal.txt ./requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir requests pdfplumber Pillow python-dotenv
+
+# Copy a simple HTTP server
+COPY backend/simple_server.py ./server.py
+
+# Copy built frontend
+COPY --from=frontend-build /frontend/build ./static
+
+# Create directories
+RUN mkdir -p ./uploads ./data
+
+ENV PYTHONUNBUFFERED=1
+
+# Run simple Python HTTP server
+CMD ["sh", "-c", "python server.py"]

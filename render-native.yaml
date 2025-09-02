@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: chatwithpdf
+    env: python
+    buildCommand: "pip install -r requirements_flask.txt && cd frontend && npm install && npm run build && cp -r build/* ../backend/static/"
+    startCommand: "cd backend && python app_flask.py"
+    plan: free
+    repo: https://github.com/Ritik143-N/chatwithpdf.git
+    branch: master
+    envVars:
+      - key: PORT
+        sync: false
+      - key: FLASK_ENV
+        value: "production"
