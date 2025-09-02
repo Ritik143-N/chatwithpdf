@@ -11,8 +11,9 @@ class SearchRequest(BaseModel):
 
 class UploadResponse(BaseModel):
     message: str
-    content: str
+    filename: str
     doc_id: str
+    num_chunks: int
 
 class SearchResponse(BaseModel):
     results: List[dict]

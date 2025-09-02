@@ -44,7 +44,7 @@ const FileUpload = ({ onUploadSuccess }) => {
     setLoading(true);
     try {
       const response = await uploadPDF(file);
-      onUploadSuccess(response);
+      onUploadSuccess(response, file);  // Pass both response and file
       setFile(null);
       // Reset file input
       const fileInput = document.getElementById('file-input');

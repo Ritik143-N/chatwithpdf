@@ -46,4 +46,14 @@ export const searchDocuments = async (query, docId = null) => {
   return response.data;
 };
 
+export const clearDocuments = async () => {
+  const response = await api.delete('/clear');
+  return response.data;
+};
+
+export const checkHealth = async () => {
+  const response = await api.get('/health');
+  return response.data;
+};
+
 export default api;

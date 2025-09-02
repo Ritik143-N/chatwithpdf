@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import FileUpload from './components/FileUpload';
 import ChatBox from './components/ChatBox';
-import DocumentViewer from './components/DocumentViewer';
+import SimplePDFViewer from './components/SimplePDFViewer';
 import Navbar from './components/Navbar';
 import './App.css';
 
 function App() {
   const [uploadedDocument, setUploadedDocument] = useState(null);
+  const [uploadedFile, setUploadedFile] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
 
-  const handleUploadSuccess = (response) => {
+  const handleUploadSuccess = (response, file) => {
     setUploadedDocument(response);
+    setUploadedFile(file);
     setShowUploadModal(false);
     console.log('Document uploaded successfully:', response);
   };
@@ -27,7 +29,7 @@ function App() {
       <div className="flex h-screen pt-16"> {/* pt-16 to account for fixed navbar */}
         {/* Left Panel - Document Viewer */}
         <div className="w-1/2 border-r border-gray-200 bg-white">
-          <DocumentViewer document={uploadedDocument} />
+          <SimplePDFViewer document={uploadedDocument} uploadedFile={uploadedFile} />
         </div>
 
         {/* Right Panel - Chat Interface */}
