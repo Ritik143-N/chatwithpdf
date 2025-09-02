@@ -1,10 +1,10 @@
 services:
-  # Single service - FastAPI serves everything (no Nginx)
+  # Backend service using simple approach
   - type: web
-    name: chatwithpdf-app
+    name: chatwithpdf-backend
     env: docker
-    dockerfilePath: Dockerfile.render-simple
-    dockerContext: .
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
     plan: starter
     envVars:
       - key: PYTHONUNBUFFERED
@@ -13,3 +13,14 @@ services:
       name: chroma-data
       mountPath: /app/chroma_db
       sizeGB: 1
+  
+  # Frontend service  
+  - type: web
+    name: chatwithpdf-frontend
+    env: docker
+    dockerfilePath: frontend/Dockerfile
+    dockerContext: frontend
+    plan: starter
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        value: https://chatwithpdf-backend.onrender.com/api/v1
