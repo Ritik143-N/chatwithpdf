@@ -1,6 +1,6 @@
 from langchain_ollama import OllamaLLM # type: ignore
 from langchain_chroma import Chroma # type: ignore
-from langchain_community.embeddings import HuggingFaceEmbeddings # type: ignore
+from langchain_huggingface import HuggingFaceEmbeddings # type: ignore
 from langchain.text_splitter import RecursiveCharacterTextSplitter # type: ignore
 from langchain.chains import RetrievalQA # type: ignore
 from langchain.prompts import PromptTemplate # type: ignore
@@ -12,56 +12,60 @@ import re
 
 class LangChainAgent:
     def __init__(self, model_name: str = "llama3.2:1b"):
-        """Initialize the LangChain agent with Ollama LLM and single ChromaDB"""
+        """Initialize the LangChain agent with optimizations"""
         self.model_name = model_name
         # Use single ChromaDB directory
         self.persist_directory = "./chroma_db"
         
-        # Initialize Ollama LLM
+        # Optimized Ollama LLM with performance settings
         self.llm = OllamaLLM(
             model=self.model_name,
-            base_url="http://localhost:11434"
+            base_url="http://localhost:11434",
+            # Performance optimizations
+            num_ctx=2048,  # Reduce context window for faster inference
+            num_predict=512,  # Limit response length
+            temperature=0.1,  # Lower temperature for faster, more deterministic responses
+            top_k=10,  # Reduce top_k for faster sampling
+            top_p=0.9,  # Reduce top_p
+            repeat_penalty=1.1
         )
         
-        # Initialize embeddings
+        # Cache embeddings model to avoid reloading
         self.embeddings = HuggingFaceEmbeddings(
             model_name="all-MiniLM-L6-v2",
-            model_kwargs={'device': 'cpu'}
+            model_kwargs={'device': 'cpu'},
+            encode_kwargs={'batch_size': 32}  # Batch processing for embeddings
         )
         
-        # Initialize ChromaDB vector store (single collection)
+        # Initialize ChromaDB vector store (single collection) with optimization
         self.vectorstore = Chroma(
             embedding_function=self.embeddings,
             persist_directory=self.persist_directory,
-            collection_name="documents"  # Single collection for all documents
+            collection_name="documents",  # Single collection for all documents
+            collection_metadata={"hnsw:space": "cosine"}  # Optimize search performance
         )
         
-        # Text splitter for chunking
+        # Optimized text splitter for chunking
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
+            chunk_size=512,  # Smaller chunks for faster processing
+            chunk_overlap=50,  # Reduced overlap
             length_function=len,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
+        
+        # Document cache to avoid reprocessing
+        self.document_cache = {}
         
         # Setup QA chain
         self._setup_qa_chain()
     
     def _setup_qa_chain(self):
         """Setup the retrieval QA chain"""
-        # Custom prompt template for better document QA
-        custom_prompt_template = """You are a helpful assistant that answers questions based on the provided document context.
-        
-Use the following pieces of context to answer the question at the end. 
-If you don't know the answer, just say "I cannot find this information in the provided document."
-
-ALWAYS cite specific parts of the document when answering.
-Be precise and detailed in your answers.
+        # Shorter, more focused prompt for faster processing
+        custom_prompt_template = """Answer the question based on the context. Be concise and cite specific parts.
 
 Context: {context}
-
 Question: {question}
-
 Answer: """
         
         self.PROMPT = PromptTemplate(
@@ -69,13 +73,13 @@ Answer: """
             input_variables=["context", "question"]
         )
         
-        # Create retrieval QA chain
+        # Create retrieval QA chain with optimized settings
         self.qa_chain = RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
             retriever=self.vectorstore.as_retriever(
                 search_type="similarity",
-                search_kwargs={"k": 8}  # Retrieve more documents for better context
+                search_kwargs={"k": 4}  # Reduced from 8 for faster processing
             ),
             chain_type_kwargs={"prompt": self.PROMPT},
             return_source_documents=True
@@ -84,6 +88,12 @@ Answer: """
     def add_documents(self, texts: List[str], doc_id: str, filename: str = None):
         """Add documents to the vector store"""
         try:
+            # Check cache first to avoid reprocessing
+            cache_key = f"{doc_id}_{hash(''.join(texts))}"
+            if cache_key in self.document_cache:
+                print(f"📋 Using cached version of document: {filename or doc_id}")
+                return True
+            
             print(f"🔄 Processing document: {filename or doc_id}")
             
             # Clear existing documents for this doc_id first
@@ -91,31 +101,42 @@ Answer: """
                 # Get existing documents with this doc_id
                 existing_docs = self.vectorstore.get(where={"doc_id": doc_id})
                 if existing_docs['ids']:
+                    # Check if content is the same
+                    if len(existing_docs['metadatas']) > 0:
+                        existing_content_hash = existing_docs['metadatas'][0].get('content_hash', '')
+                        new_content_hash = str(hash(''.join(texts)))
+                        
+                        if existing_content_hash == new_content_hash:
+                            print(f"📋 Document unchanged, skipping: {filename or doc_id}")
+                            self.document_cache[cache_key] = True
+                            return True
+                    
                     print(f"🧹 Removing {len(existing_docs['ids'])} existing chunks for doc_id: {doc_id}")
                     self.vectorstore.delete(ids=existing_docs['ids'])
             except Exception as e:
                 print(f"Note: Could not clear existing docs (may not exist): {e}")
             
-            # Create documents with metadata
+            # Create documents with simplified metadata for better performance
             documents = []
             total_chunks = 0
+            new_content_hash = str(hash(''.join(texts)))
             
             for i, text in enumerate(texts):
                 # Split text into chunks
                 chunks = self.text_splitter.split_text(text)
                 
                 for j, chunk in enumerate(chunks):
-                    # Enhanced metadata
+                    # Simplified metadata for faster processing
                     metadata = {
                         "doc_id": doc_id,
                         "chunk_id": f"{doc_id}_{i}_{j}",
                         "source": filename or f"document_{i}",
                         "chunk_index": j,
                         "text_index": i,
-                        "chunk_length": len(chunk)
+                        "content_hash": new_content_hash  # For change detection
                     }
                     
-                    # Add content-based metadata for better search
+                    # Add minimal content-based metadata for better search
                     chunk_lower = chunk.lower()
                     if any(word in chunk_lower for word in ["risk", "security", "monitoring", "performance"]):
                         if "risk" in chunk_lower:
@@ -127,10 +148,6 @@ Answer: """
                         if "performance" in chunk_lower:
                             metadata["contains_performance"] = True
                     
-                    # Check for document metadata (author, date, etc.)
-                    if any(word in chunk_lower for word in ["prepared by", "author", "date:", "version:"]):
-                        metadata["has_metadata"] = True
-                    
                     doc = Document(
                         page_content=chunk,
                         metadata=metadata
@@ -138,13 +155,17 @@ Answer: """
                     documents.append(doc)
                     total_chunks += 1
             
-            # Add to vector store
-            self.vectorstore.add_documents(documents)
-            print(f"✅ Successfully stored {total_chunks} chunks in ChromaDB")
-            
-            # Verify storage
-            verification = self.vectorstore.get(where={"doc_id": doc_id})
-            print(f"🔍 Verification: {len(verification['ids'])} chunks stored for doc_id: {doc_id}")
+            # Batch add documents for better performance
+            if documents:
+                self.vectorstore.add_documents(documents)
+                print(f"✅ Successfully stored {total_chunks} chunks in ChromaDB")
+                
+                # Cache successful processing
+                self.document_cache[cache_key] = True
+                
+                # Verify storage
+                verification = self.vectorstore.get(where={"doc_id": doc_id})
+                print(f"🔍 Verification: {len(verification['ids'])} chunks stored for doc_id: {doc_id}")
             
             return True
             
@@ -165,7 +186,7 @@ Answer: """
                 retriever = self.vectorstore.as_retriever(
                     search_type="similarity",
                     search_kwargs={
-                        "k": 8,
+                        "k": 4,  # Reduced from 8 for faster processing
                         "filter": {"doc_id": doc_id}
                     }
                 )
