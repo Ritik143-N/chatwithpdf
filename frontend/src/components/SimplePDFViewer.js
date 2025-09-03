@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-const SimplePDFViewer = ({ uploadedFile, document }) => {
+const DocumentViewer = ({ uploadedFile, document }) => {
   const [pdfUrl, setPdfUrl] = useState(null);
+  const [fileType, setFileType] = useState(null);
 
   useEffect(() => {
     if (uploadedFile) {
@@ -9,10 +10,48 @@ const SimplePDFViewer = ({ uploadedFile, document }) => {
       const url = URL.createObjectURL(uploadedFile);
       setPdfUrl(url);
       
+      // Determine file type
+      const extension = uploadedFile.name.split('.').pop().toLowerCase();
+      setFileType(extension);
+      
       // Cleanup function to revoke the URL when component unmounts
       return () => URL.revokeObjectURL(url);
     }
   }, [uploadedFile]);
+
+  const getFileIcon = (extension) => {
+    const icons = {
+      'pdf': '📄',
+      'docx': '📝',
+      'doc': '📝', 
+      'pptx': '📊',
+      'ppt': '📊',
+      'xlsx': '📗',
+      'xls': '📗',
+      'txt': '📄',
+      'rtf': '📝',
+      'md': '📄',
+      'csv': '📊'
+    };
+    return icons[extension] || '📄';
+  };
+
+  const getFileTypeDescription = (extension) => {
+    const descriptions = {
+      'pdf': 'PDF Document',
+      'docx': 'Word Document',
+      'doc': 'Word Document (Legacy)',
+      'pptx': 'PowerPoint Presentation',
+      'ppt': 'PowerPoint Presentation (Legacy)',
+      'xlsx': 'Excel Spreadsheet',
+      'xls': 'Excel Spreadsheet (Legacy)',
+      'txt': 'Text File',
+      'rtf': 'Rich Text Document',
+      'md': 'Markdown File',
+      'csv': 'CSV File'
+    };
+    return descriptions[extension] || 'Document';
+  };
 
   // If no document uploaded, show empty state
   if (!uploadedFile && !document) {
@@ -23,7 +62,7 @@ const SimplePDFViewer = ({ uploadedFile, document }) => {
         </svg>
         <h3 className="text-xl font-medium text-gray-500 mb-2">No document loaded</h3>
         <p className="text-gray-400 text-center">
-          Upload a PDF document to view it here and start chatting with its content.
+          Upload a document (PDF, DOCX, PPTX, TXT, etc.) to view it here and start chatting with its content.
         </p>
       </div>
     );
@@ -35,17 +74,17 @@ const SimplePDFViewer = ({ uploadedFile, document }) => {
       <div className="flex-shrink-0 border-b border-gray-200 bg-white p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-              </svg>
+            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">
+                {fileType ? getFileIcon(fileType) : '📄'}
+              </span>
             </div>
             <div>
               <h2 className="text-lg font-medium text-gray-900 truncate max-w-64">
                 {uploadedFile ? uploadedFile.name : 'Document'}
               </h2>
               <p className="text-sm text-gray-500">
-                {uploadedFile ? `${(uploadedFile.size / 1024 / 1024).toFixed(2)} MB` : 'Document loaded'}
+                {uploadedFile ? `${getFileTypeDescription(fileType)} • ${(uploadedFile.size / 1024 / 1024).toFixed(2)} MB` : 'Document loaded'}
               </p>
             </div>
           </div>
@@ -65,9 +104,10 @@ const SimplePDFViewer = ({ uploadedFile, document }) => {
         </div>
       </div>
 
-      {/* PDF Viewer */}
+      {/* Document Viewer */}
       <div className="flex-1 flex flex-col">
-        {pdfUrl ? (
+        {pdfUrl && fileType === 'pdf' ? (
+          // PDF Viewer
           <div className="flex-1 relative">
             <iframe
               src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&page=1&view=FitH`}
@@ -78,6 +118,69 @@ const SimplePDFViewer = ({ uploadedFile, document }) => {
                 backgroundColor: '#f5f5f5'
               }}
             />
+          </div>
+        ) : fileType && fileType !== 'pdf' ? (
+          // Non-PDF Document Display
+          <div className="flex-1 overflow-auto p-6 bg-gray-50">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
+                <div className="flex items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg mb-4">
+                  <div className="text-center">
+                    <span className="text-4xl mb-2 block">
+                      {getFileIcon(fileType)}
+                    </span>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">
+                      {getFileTypeDescription(fileType)} Processed
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Document content extracted and ready for AI chat
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-600">File Type:</span>
+                      <span className="ml-2 text-gray-900">{getFileTypeDescription(fileType)}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Size:</span>
+                      <span className="ml-2 text-gray-900">
+                        {uploadedFile ? `${(uploadedFile.size / 1024 / 1024).toFixed(2)} MB` : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white shadow rounded-lg p-6">
+                <h4 className="text-md font-medium text-gray-900 mb-3">
+                  💬 Start Chatting with Your Document
+                </h4>
+                <div className="text-sm text-gray-600 space-y-2">
+                  <p>• Ask questions about the document content</p>
+                  <p>• Request summaries or specific information</p>
+                  <p>• Get insights and analysis</p>
+                </div>
+                
+                {fileType !== 'pdf' && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex">
+                      <svg className="w-5 h-5 text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <div className="ml-3 text-sm text-blue-700">
+                        <p>
+                          Non-PDF documents are processed by extracting their text content. 
+                          Original formatting may not be preserved in the preview, but all content is available for chat.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           // Fallback content display
@@ -152,4 +255,4 @@ const SimplePDFViewer = ({ uploadedFile, document }) => {
   );
 };
 
-export default SimplePDFViewer;
+export default DocumentViewer;

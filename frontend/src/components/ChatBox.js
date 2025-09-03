@@ -1,10 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { askQuestion } from '../services/api';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { askQuestionInSession, switchLLMProvider, getAvailableProviders, getSessionDetails } from '../services/api';
+import ChatMessage from './ChatMessage';
+import LLMProviderIndicator from './LLMProviderIndicator';
+import ModelSelector from './ModelSelector';
 
-const ChatBox = ({ uploadedDocument }) => {
+const ChatBox = ({ uploadedDocument, currentSessionId, sessionData }) => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gemini'); // Default to Gemini
+  const [modelSwitching, setModelSwitching] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -12,6 +17,91 @@ const ChatBox = ({ uploadedDocument }) => {
   };
 
   useEffect(scrollToBottom, [messages]);
+
+  // Memoize loadSessionMessages to avoid recreating it on every render
+  const loadSessionMessages = useCallback(async () => {
+    try {
+      if (!currentSessionId) return;
+      
+      const sessionDetails = await getSessionDetails(currentSessionId);
+      const sessionMessages = sessionDetails.messages || [];
+      
+      // Convert session messages to ChatBox format
+      const formattedMessages = sessionMessages.map(msg => ({
+        type: msg.message_type === 'user' ? 'user' : 'bot',
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        model: msg.model_used,
+        context: msg.context_sources || []
+      }));
+      
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error loading session messages:', error);
+      setMessages([]);
+    }
+  }, [currentSessionId]);
+
+  // Load session messages when session changes
+  useEffect(() => {
+    if (currentSessionId && sessionData) {
+      loadSessionMessages();
+    } else {
+      setMessages([]);
+    }
+  }, [currentSessionId, sessionData, loadSessionMessages]);
+
+  // Initialize with current provider from backend
+  useEffect(() => {
+    const initializeProvider = async () => {
+      try {
+        const providers = await getAvailableProviders();
+        if (providers && providers.current_provider) {
+          setSelectedModel(providers.current_provider);
+        }
+      } catch (error) {
+        console.error('Error fetching current provider:', error);
+        // Keep default 'gemini' if error
+      }
+    };
+
+    initializeProvider();
+  }, []);
+
+  const handleModelChange = async (modelId) => {
+    if (modelId === selectedModel) return;
+
+    setModelSwitching(true);
+    try {
+      const response = await switchLLMProvider(modelId);
+      if (response.status === 'success') {
+        setSelectedModel(modelId);
+        
+        // Add a system message about the model switch
+        const systemMessage = {
+          type: 'system',
+          content: `Switched to ${modelId.charAt(0).toUpperCase() + modelId.slice(1)} model. You can continue the conversation with the new model.`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, systemMessage]);
+      } else {
+        throw new Error(response.message || 'Failed to switch model');
+      }
+    } catch (error) {
+      console.error('Error switching model:', error);
+      
+      // Add error message
+      const errorMessage = {
+        type: 'system',
+        content: `Failed to switch to ${modelId} model. Please try again.`,
+        timestamp: new Date(),
+        isError: true
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setModelSwitching(false);
+    }
+  };
 
   // Add welcome message when document is uploaded
   useEffect(() => {
@@ -33,6 +123,11 @@ const ChatBox = ({ uploadedDocument }) => {
       return;
     }
 
+    if (!currentSessionId) {
+      alert('No active session. Please upload a document to start a new session.');
+      return;
+    }
+
     const userMessage = {
       type: 'user',
       content: inputValue.trim(),
@@ -40,16 +135,19 @@ const ChatBox = ({ uploadedDocument }) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const question = inputValue.trim();
     setInputValue('');
     setLoading(true);
 
     try {
-      const response = await askQuestion(inputValue.trim(), uploadedDocument?.doc_id);
+      // Use session-based messaging
+      const response = await askQuestionInSession(currentSessionId, question);
       const botMessage = {
         type: 'bot',
         content: response.answer,
         context: response.context,
         timestamp: new Date(),
+        model: selectedModel,
       };
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
@@ -70,20 +168,50 @@ const ChatBox = ({ uploadedDocument }) => {
       {/* Chat Header */}
       <div className="flex-shrink-0 border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <h2 className="text-lg font-medium text-gray-900">Chat Assistant</h2>
             <p className="text-sm text-gray-500">
-              {uploadedDocument 
-                ? 'Ask questions about your document' 
-                : 'Upload a document to start chatting'
+              {currentSessionId && sessionData 
+                ? `Chatting about: ${sessionData.document_name || sessionData.document_filename || 'Document'}`
+                : uploadedDocument 
+                  ? 'Ask questions about your document' 
+                  : 'Upload a document to start chatting'
               }
             </p>
+            {currentSessionId && (
+              <p className="text-xs text-blue-600 mt-1">
+                Session: {currentSessionId.slice(0, 8)}...
+              </p>
+            )}
+            <div className="mt-2">
+              <LLMProviderIndicator />
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${uploadedDocument ? 'bg-green-400' : 'bg-gray-400'}`}></div>
-            <span className="text-xs text-gray-500">
-              {uploadedDocument ? 'Ready' : 'Waiting'}
-            </span>
+          
+          <div className="flex items-center space-x-4">
+            {/* Model Selector */}
+            <div className="flex flex-col items-end">
+              <div className="mb-2">
+                <ModelSelector 
+                  selectedModel={selectedModel}
+                  onModelChange={handleModelChange}
+                />
+              </div>
+              {modelSwitching && (
+                <div className="flex items-center space-x-2 text-xs text-blue-600">
+                  <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Switching model...</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Status Indicator */}
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${currentSessionId ? 'bg-green-400' : uploadedDocument ? 'bg-yellow-400' : 'bg-gray-400'}`}></div>
+              <span className="text-xs text-gray-500">
+                {currentSessionId ? 'Active Session' : uploadedDocument ? 'Ready' : 'Waiting'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -101,42 +229,22 @@ const ChatBox = ({ uploadedDocument }) => {
         )}
 
         {messages.map((message, index) => (
-          <div
+          <ChatMessage
             key={index}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className="flex items-start space-x-2 max-w-xs lg:max-w-md">
-              {message.type === 'bot' && (
-                <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
-              <div
-                className={`px-4 py-2 rounded-lg ${
-                  message.type === 'user'
-                    ? 'bg-purple-600 text-white ml-auto'
-                    : 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <p className="text-xs mt-1 opacity-70">
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-              </div>
-              {message.type === 'user' && (
-                <div className="flex-shrink-0 w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
-            </div>
-          </div>
+            message={message.content}
+            isUser={message.type === 'user'}
+            isSystem={message.type === 'system'}
+            isError={message.isError}
+            timestamp={message.timestamp}
+            onCopy={async (text) => {
+              try {
+                await navigator.clipboard.writeText(text);
+                // Could add a toast notification here
+              } catch (err) {
+                console.error('Failed to copy text:', err);
+              }
+            }}
+          />
         ))}
 
         {loading && (

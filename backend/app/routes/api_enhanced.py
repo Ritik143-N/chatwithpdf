@@ -1,15 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
-from typing import List, Optional
-from ..models.schemas import UploadResponse, QueryRequest, SearchResponse, AskResponse, ContextItem
-from ..models.session_schemas import (
-    SessionListResponse, SessionDetailResponse, CreateSessionRequest, 
-    SaveMessageRequest, ChatSession, ChatMessage
-)
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from typing import List
+from ..models.schemas import UploadResponse, QueryRequest, SearchResponse, AskResponse
 from ..services.document_service import document_processor, chunk_text, generate_doc_id
 from ..services.enhanced_langchain_agent import enhanced_langchain_agent
 from ..services.mistral_service import get_mistral_service, is_mistral_available
-from ..services.gemini_service import get_gemini_service, is_gemini_available
-from ..services.session_service import session_service
 import os
 from dotenv import load_dotenv
 
@@ -118,17 +112,13 @@ async def ask_question(request: QueryRequest):
         print(f"✅ Enhanced LangChain answer generated with {result.get('source_count', 0)} sources using {result.get('llm_provider', 'unknown')} provider")
         
         # Extract context from sources for frontend display
-        context = []
-        for i, source in enumerate(result.get("sources", [])[:3]):  # Top 3 sources
-            context.append(ContextItem(
-                chunk_index=i,
-                content=source.get("content_preview", ""),
-                metadata=source.get("metadata", {})
-            ))
+        context_docs = []
+        for source in result.get("sources", [])[:3]:  # Top 3 sources
+            context_docs.append(source.get("content_preview", ""))
         
         return AskResponse(
             answer=result["answer"],
-            context=context
+            context=context_docs
         )
         
     except Exception as e:
@@ -266,67 +256,6 @@ async def test_mistral_connection():
             "message": f"Error testing Mistral connection: {str(e)}"
         }
 
-# Gemini-specific endpoints
-@router.post("/gemini/test")
-async def test_gemini_connection():
-    """Test Google Gemini API connection"""
-    try:
-        gemini_service = get_gemini_service()
-        if not gemini_service:
-            return {
-                "status": "error",
-                "message": "Gemini service not available. Please check GEMINI_API_KEY environment variable."
-            }
-        
-        test_result = gemini_service.test_connection()
-        return test_result
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error testing Gemini connection: {str(e)}"
-        }
-
-@router.get("/gemini/models")
-async def list_gemini_models():
-    """List available Gemini models"""
-    try:
-        gemini_service = get_gemini_service()
-        if not gemini_service:
-            return {
-                "status": "error",
-                "message": "Gemini service not available. Please check GEMINI_API_KEY environment variable."
-            }
-        
-        models_result = gemini_service.list_available_models()
-        return models_result
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error listing Gemini models: {str(e)}"
-        }
-
-@router.post("/gemini/switch-model")
-async def switch_gemini_model(model_name: str):
-    """Switch Gemini model"""
-    try:
-        gemini_service = get_gemini_service()
-        if not gemini_service:
-            return {
-                "status": "error",
-                "message": "Gemini service not available. Please check GEMINI_API_KEY environment variable."
-            }
-        
-        switch_result = gemini_service.switch_model(model_name)
-        return switch_result
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error switching Gemini model: {str(e)}"
-        }
-
 @router.post("/llm/switch")
 async def switch_llm_provider(provider: str, model_name: str = None):
     """Switch LLM provider at runtime"""
@@ -362,12 +291,6 @@ async def get_llm_providers():
         detailed_info = {
             "current_provider": provider_info["current_provider"],
             "providers": {
-                "gemini": {
-                    "available": provider_info["gemini_available"],
-                    "description": "Google Gemini API - Advanced multimodal AI with excellent reasoning",
-                    "models": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"],
-                    "requires": "GEMINI_API_KEY environment variable"
-                },
                 "mistral": {
                     "available": provider_info["mistral_available"],
                     "description": "Mistral API - Fast and high-quality commercial LLM service",
@@ -383,7 +306,7 @@ async def get_llm_providers():
                 "auto": {
                     "available": True,
                     "description": "Auto-detect - Automatically choose the best available provider",
-                    "priority": ["gemini", "mistral", "ollama"]
+                    "priority": ["mistral", "ollama"]
                 }
             }
         }
@@ -526,206 +449,3 @@ async def get_document_content(doc_id: str):
     except Exception as e:
         print(f"❌ Error getting document content: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving document content: {str(e)}")
-
-# ==========================================
-# SESSION MANAGEMENT ENDPOINTS
-# ==========================================
-
-@router.post("/sessions", response_model=ChatSession)
-async def create_session(request: CreateSessionRequest):
-    """Create a new chat session for a document"""
-    try:
-        # Get current model provider
-        provider_info = enhanced_langchain_agent.get_provider_info()
-        current_provider = provider_info.get("current_provider", "unknown")
-        
-        session = session_service.create_session(
-            document_id=request.document_id,
-            document_name=request.document_name,
-            document_filename=request.document_filename,
-            model_provider=current_provider
-        )
-        
-        return session
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
-
-@router.get("/sessions", response_model=SessionListResponse)
-async def get_sessions(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)):
-    """Get list of all chat sessions"""
-    try:
-        return session_service.get_sessions(limit=limit, offset=offset)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get sessions: {str(e)}")
-
-@router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
-async def get_session_detail(session_id: str):
-    """Get detailed information about a specific session including messages"""
-    try:
-        session_detail = session_service.get_session_detail(session_id)
-        if not session_detail:
-            raise HTTPException(status_code=404, detail="Session not found")
-        return session_detail
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get session: {str(e)}")
-
-@router.get("/sessions/document/{document_id}")
-async def get_sessions_by_document(document_id: str):
-    """Get all sessions for a specific document"""
-    try:
-        sessions = session_service.get_sessions_by_document(document_id)
-        return {"sessions": sessions, "count": len(sessions)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get document sessions: {str(e)}")
-
-@router.post("/sessions/{session_id}/messages", response_model=ChatMessage)
-async def save_message(session_id: str, request: SaveMessageRequest):
-    """Save a message to a session"""
-    try:
-        # Verify session exists
-        session = session_service.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        message = session_service.save_message(
-            session_id=request.session_id,
-            message_type=request.message_type,
-            content=request.content,
-            model_used=request.model_used,
-            context_sources=request.context_sources
-        )
-        
-        return message
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save message: {str(e)}")
-
-@router.get("/sessions/{session_id}/messages")
-async def get_session_messages(
-    session_id: str, 
-    limit: int = Query(100, ge=1, le=500), 
-    offset: int = Query(0, ge=0)
-):
-    """Get messages for a specific session"""
-    try:
-        # Verify session exists
-        session = session_service.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        messages = session_service.get_session_messages(session_id, limit=limit, offset=offset)
-        return {"messages": messages, "count": len(messages)}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get messages: {str(e)}")
-
-@router.delete("/sessions/{session_id}")
-async def delete_session(session_id: str):
-    """Delete a session and all its messages"""
-    try:
-        success = session_service.delete_session(session_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        return {"message": "Session deleted successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
-
-@router.put("/sessions/{session_id}/model")
-async def update_session_model(session_id: str, model_provider: str):
-    """Update the model provider for a session"""
-    try:
-        success = session_service.update_session_model(session_id, model_provider)
-        if not success:
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        return {"message": f"Session model updated to {model_provider}"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update session model: {str(e)}")
-
-# Enhanced ask endpoint with session support
-@router.post("/sessions/{session_id}/ask", response_model=AskResponse)
-async def ask_question_with_session(session_id: str, request: QueryRequest):
-    """Ask a question within a specific session context"""
-    try:
-        # Verify session exists
-        session = session_service.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        print(f"🤖 Session-based question: '{request.query}' for session: {session_id}")
-        
-        # Use the document_id from the session if not provided in request
-        doc_id = request.doc_id or session.document_id
-        
-        # Get current model provider
-        provider_info = enhanced_langchain_agent.get_provider_info()
-        current_provider = provider_info.get("current_provider", "unknown")
-        
-        # Use enhanced LangChain agent to answer the question
-        result = enhanced_langchain_agent.ask_question(request.query, doc_id)
-        
-        if not result.get("search_successful", False):
-            bot_response = result.get("answer", "Sorry, I couldn't process your question.")
-        else:
-            bot_response = result.get("answer", "")
-        
-        # Save user message to session
-        session_service.save_message(
-            session_id=session_id,
-            message_type="user",
-            content=request.query
-        )
-        
-        # Save bot response to session
-        context_sources = []
-        if result.get("sources"):
-            context_sources = [{"content": src.get("content_preview", ""), "metadata": src.get("metadata", {})} 
-                             for src in result["sources"]]
-        
-        session_service.save_message(
-            session_id=session_id,
-            message_type="bot",
-            content=bot_response,
-            model_used=current_provider,
-            context_sources=context_sources
-        )
-        
-        print(f"✅ Session answer generated with {result.get('source_count', 0)} sources using {current_provider}")
-        
-        # Extract context from sources for frontend display
-        context = []
-        if result.get("sources"):
-            for i, source in enumerate(result["sources"][:3]):
-                context.append(ContextItem(
-                    chunk_index=i,
-                    content=source.get("content_preview", ""),
-                    metadata=source.get("metadata", {})
-                ))
-        
-        return AskResponse(
-            answer=bot_response,
-            context=context,
-            session_id=session_id
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error in session-based ask: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error processing question: {str(e)}")

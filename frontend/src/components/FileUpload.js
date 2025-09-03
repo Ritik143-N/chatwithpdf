@@ -1,17 +1,41 @@
-import React, { useState } from 'react';
-import { uploadPDF } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { uploadDocument, getSupportedFormats } from '../services/api';
 
 const FileUpload = ({ onUploadSuccess }) => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [supportedFormats, setSupportedFormats] = useState([]);
+  const [formatDescriptions, setFormatDescriptions] = useState({});
+
+  // Load supported formats on component mount
+  useEffect(() => {
+    const loadSupportedFormats = async () => {
+      try {
+        const response = await getSupportedFormats();
+        setSupportedFormats(response.supported_formats);
+        setFormatDescriptions(response.format_descriptions);
+      } catch (error) {
+        console.error('Error loading supported formats:', error);
+        // Fallback to basic formats
+        setSupportedFormats(['.pdf', '.docx', '.txt']);
+      }
+    };
+    
+    loadSupportedFormats();
+  }, []);
+
+  const isValidFileType = (file) => {
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    return supportedFormats.includes(fileExtension);
+  };
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
-    if (selectedFile && selectedFile.type === 'application/pdf') {
+    if (selectedFile && isValidFileType(selectedFile)) {
       setFile(selectedFile);
     } else {
-      alert('Please select a PDF file');
+      alert(`Please select a supported file format: ${supportedFormats.join(', ')}`);
     }
   };
 
@@ -19,10 +43,10 @@ const FileUpload = ({ onUploadSuccess }) => {
     e.preventDefault();
     setDragOver(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && droppedFile.type === 'application/pdf') {
+    if (droppedFile && isValidFileType(droppedFile)) {
       setFile(droppedFile);
     } else {
-      alert('Please drop a PDF file');
+      alert(`Please drop a supported file format: ${supportedFormats.join(', ')}`);
     }
   };
 
@@ -43,7 +67,7 @@ const FileUpload = ({ onUploadSuccess }) => {
 
     setLoading(true);
     try {
-      const response = await uploadPDF(file);
+      const response = await uploadDocument(file);
       onUploadSuccess(response, file);  // Pass both response and file
       setFile(null);
       // Reset file input
@@ -55,6 +79,26 @@ const FileUpload = ({ onUploadSuccess }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getFileIcon = (filename) => {
+    const extension = '.' + filename.split('.').pop().toLowerCase();
+    
+    const iconColors = {
+      '.pdf': 'text-red-600',
+      '.docx': 'text-blue-600',
+      '.doc': 'text-blue-600',
+      '.pptx': 'text-orange-600',
+      '.ppt': 'text-orange-600',
+      '.xlsx': 'text-green-600',
+      '.xls': 'text-green-600',
+      '.txt': 'text-gray-600',
+      '.rtf': 'text-purple-600',
+      '.md': 'text-gray-800',
+      '.csv': 'text-green-700'
+    };
+    
+    return iconColors[extension] || 'text-gray-600';
   };
 
   return (
@@ -87,16 +131,21 @@ const FileUpload = ({ onUploadSuccess }) => {
           </div>
           <div>
             <p className="font-medium text-gray-900">
-              Drop your PDF here
+              Drop your document here
             </p>
             <p className="text-sm text-gray-500">
-              or click to browse files
+              Supports: PDF, DOCX, PPTX, TXT, RTF, Excel & more
             </p>
+            {supportedFormats.length > 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                {supportedFormats.join(', ')}
+              </p>
+            )}
           </div>
           <input
             id="file-input"
             type="file"
-            accept=".pdf"
+            accept={supportedFormats.join(',')}
             onChange={handleFileChange}
             className="hidden"
           />
@@ -114,7 +163,7 @@ const FileUpload = ({ onUploadSuccess }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center min-w-0 flex-1">
               <svg
-                className="h-6 w-6 text-red-600 flex-shrink-0"
+                className={`h-6 w-6 flex-shrink-0 ${getFileIcon(file.name)}`}
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -124,6 +173,9 @@ const FileUpload = ({ onUploadSuccess }) => {
                 <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
                 <p className="text-xs text-gray-500">
                   {(file.size / 1024 / 1024).toFixed(2)} MB
+                  {formatDescriptions['.' + file.name.split('.').pop().toLowerCase()] && 
+                    ` • ${formatDescriptions['.' + file.name.split('.').pop().toLowerCase()]}`
+                  }
                 </p>
               </div>
             </div>

@@ -157,12 +157,14 @@ def upload_pdf():
             })
             
         except Exception as e:
+            raise e
             # Clean up temporary file in case of error
             if os.path.exists(filepath):
                 os.remove(filepath)
             return jsonify({"error": str(e)}), 500
     
     except Exception as e:
+        raise e
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
 @app.route('/api/v1/ask', methods=['POST'])

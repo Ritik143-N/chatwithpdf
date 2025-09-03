@@ -15,12 +15,7 @@
 
 .App-header {
   background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  padding: 20px;
   color: white;
 }
 
@@ -35,4 +30,51 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Enhanced Document Viewer Styles */
+.document-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.document-content h1 {
+  color: #1f2937;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+.document-content h2 {
+  color: #374151;
+  margin-top: 2rem;
+}
+
+.document-content h3 {
+  color: #4b5563;
+  margin-top: 1.5rem;
+}
+
+.document-content p {
+  color: #6b7280;
+  text-align: left;
+}
+
+.document-content table {
+  font-size: 0.875rem;
+}
+
+.document-content table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.document-content table td {
+  font-size: 0.8rem;
+}
+
+.page-break {
+  font-size: 0.75rem !important;
+  color: #9ca3af !important;
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.05em;
 }

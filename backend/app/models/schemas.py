@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 class QueryRequest(BaseModel):
     query: str
@@ -18,6 +18,12 @@ class UploadResponse(BaseModel):
 class SearchResponse(BaseModel):
     results: List[dict]
 
+class ContextItem(BaseModel):
+    chunk_index: int
+    content: str
+    metadata: Dict[str, Any]
+
 class AskResponse(BaseModel):
     answer: str
-    context: List[str]
+    context: List[ContextItem]
+    session_id: Optional[str] = None
