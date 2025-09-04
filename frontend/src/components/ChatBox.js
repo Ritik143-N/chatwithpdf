@@ -26,14 +26,35 @@ const ChatBox = ({ uploadedDocument, currentSessionId, sessionData }) => {
       const sessionDetails = await getSessionDetails(currentSessionId);
       const sessionMessages = sessionDetails.messages || [];
       
+      console.log('Raw session messages:', sessionMessages); // Debug log
+      
       // Convert session messages to ChatBox format
-      const formattedMessages = sessionMessages.map(msg => ({
-        type: msg.message_type === 'user' ? 'user' : 'bot',
-        content: msg.content,
-        timestamp: new Date(msg.created_at),
-        model: msg.model_used,
-        context: msg.context_sources || []
-      }));
+      const formattedMessages = sessionMessages.map(msg => {
+        // Handle different timestamp field names and formats
+        let timestamp;
+        const timestampValue = msg.timestamp || msg.created_at;
+        
+        console.log('Processing message timestamp:', timestampValue, typeof timestampValue); // Debug log
+        
+        if (timestampValue) {
+          timestamp = new Date(timestampValue);
+          // Check if the date is valid
+          if (isNaN(timestamp.getTime())) {
+            console.warn('Invalid timestamp format:', timestampValue);
+            timestamp = new Date(); // Use current date as fallback
+          }
+        } else {
+          timestamp = new Date(); // Use current date as fallback
+        }
+
+        return {
+          type: msg.message_type === 'user' ? 'user' : 'bot',
+          content: msg.content,
+          timestamp: timestamp,
+          model: msg.model_used,
+          context: msg.context_sources || []
+        };
+      });
       
       setMessages(formattedMessages);
     } catch (error) {

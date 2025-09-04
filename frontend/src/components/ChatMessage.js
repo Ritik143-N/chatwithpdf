@@ -21,7 +21,15 @@ const ChatMessage = ({ message, isUser = false, isSystem = false, isError = fals
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '';
+    
     const date = new Date(timestamp);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp in ChatMessage:', timestamp);
+      return '';
+    }
+    
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 

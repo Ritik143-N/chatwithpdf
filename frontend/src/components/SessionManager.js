@@ -16,6 +16,7 @@ const SessionManager = ({ currentSessionId, onSessionSelect, onNewSession }) => 
     try {
       setLoading(true);
       const response = await getSessions(20, 0); // Get last 20 sessions
+      console.log('Sessions data:', response); // Debug log
       setSessions(response.sessions || []);
       setError(null);
     } catch (err) {
@@ -48,7 +49,18 @@ const SessionManager = ({ currentSessionId, onSessionSelect, onNewSession }) => 
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) {
+      return 'Unknown';
+    }
+    
     const date = new Date(dateString);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date in SessionManager:', dateString);
+      return 'Invalid Date';
+    }
+    
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -140,7 +152,7 @@ const SessionManager = ({ currentSessionId, onSessionSelect, onNewSession }) => 
                     </div>
                   </div>
                   <div className="session-date">
-                    {formatDate(session.updated_at)}
+                    {formatDate(session.last_activity || session.updated_at)}
                   </div>
                 </div>
                 

@@ -1,11 +1,13 @@
 """
 Session and Chat History Management Models
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 class ChatMessage(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     id: Optional[str] = None
     session_id: str
     message_type: str  # 'user', 'bot', 'system'
@@ -15,6 +17,8 @@ class ChatMessage(BaseModel):
     context_sources: Optional[List[Dict[str, Any]]] = None
 
 class ChatSession(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     session_id: str
     document_id: str
     document_name: str
@@ -38,6 +42,8 @@ class CreateSessionRequest(BaseModel):
     document_filename: str
 
 class SaveMessageRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     session_id: str
     message_type: str
     content: str
