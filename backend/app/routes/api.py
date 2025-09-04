@@ -467,7 +467,6 @@ async def get_supported_formats():
         ".txt": "Plain Text Files",
         ".rtf": "Rich Text Format Documents",
         ".md": "Markdown Files",
-        ".csv": "Comma-Separated Values Files"
     }
     
     return {

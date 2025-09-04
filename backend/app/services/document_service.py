@@ -35,7 +35,6 @@ class DocumentProcessor:
             '.txt': self._extract_from_text,
             '.rtf': self._extract_from_rtf,
             '.md': self._extract_from_markdown,
-            '.csv': self._extract_from_csv,
         }
     
     def get_supported_formats(self) -> List[str]:

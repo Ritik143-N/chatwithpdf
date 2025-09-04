@@ -163,7 +163,7 @@ const EnhancedDocumentViewer = ({ uploadedFile, document }) => {
               </>
             ) : null}
             
-            <button
+            {/* <button
               onClick={() => window.open(pdfUrl, '_blank')}
               className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
               disabled={!pdfUrl && fileType === 'pdf'}
@@ -173,7 +173,7 @@ const EnhancedDocumentViewer = ({ uploadedFile, document }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
               Open
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

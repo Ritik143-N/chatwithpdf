@@ -95,7 +95,6 @@ const FileUpload = ({ onUploadSuccess }) => {
       '.txt': 'text-gray-600',
       '.rtf': 'text-purple-600',
       '.md': 'text-gray-800',
-      '.csv': 'text-green-700'
     };
     
     return iconColors[extension] || 'text-gray-600';
